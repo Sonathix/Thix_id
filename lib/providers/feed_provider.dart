@@ -96,7 +96,7 @@ class FeedProvider extends ChangeNotifier {
   // INTERACTIONS (LIKE, COMMENTAIRE)
   // ============================================================
   
-  // ⭐ CORRIGÉ - Utilisation de cast dynamique pour isLikedByCurrentUser
+  // ⭐ CORRIGÉ - Version simplifiée sans utiliser les paramètres manquants
   Future<void> toggleLike(String postId) async {
     final index = _posts.indexWhere((p) => p.id == postId);
     if (index == -1) return;
@@ -105,26 +105,11 @@ class FeedProvider extends ChangeNotifier {
     final dynamicPost = post as dynamic;
     final wasLiked = dynamicPost.isLikedByCurrentUser ?? false;
     
-    // Créer un nouvel objet avec les valeurs mises à jour
-    final updatedPost = NetworkPost(
-      id: post.id,
-      userId: post.userId,
-      authorName: post.authorName,
-      authorAvatar: post.authorAvatar,
-      authorTitle: post.authorTitle,
-      content: post.content,
-      mediaUrl: dynamicPost.mediaUrl,
-      mediaType: dynamicPost.mediaType ?? 'none',
-      isPublic: post.isPublic,
+    // Mise à jour optimiste avec copyWith existant
+    final updatedPost = post.copyWith(
       likesCount: wasLiked ? post.likesCount - 1 : post.likesCount + 1,
-      commentsCount: post.commentsCount,
-      sharesCount: dynamicPost.sharesCount ?? 0,
-      createdAt: post.createdAt,
-      isLikedByCurrentUser: !wasLiked,
-      isSavedByCurrentUser: dynamicPost.isSavedByCurrentUser ?? false,
     );
     
-    // Optimistic update
     _posts[index] = updatedPost;
     notifyListeners();
     
