@@ -124,7 +124,6 @@ class _ProfilePageState extends State<ProfilePage> with TickerProviderStateMixin
                   SliverToBoxAdapter(child: _buildCoverBanner()),
                   SliverToBoxAdapter(child: _buildProfileHeader(isOwnProfile)),
                   
-                  // Post épinglé
                   if (_pinnedPosts.isNotEmpty)
                     SliverToBoxAdapter(
                       child: PinnedPost(
@@ -143,7 +142,6 @@ class _ProfilePageState extends State<ProfilePage> with TickerProviderStateMixin
                   
                   SliverToBoxAdapter(child: _buildTabsAndSwitch()),
                   
-                  // Onglets corrigés
                   if (_selectedTab == 0)
                     _buildPostsContent(_posts)
                   else if (_selectedTab == 1)
@@ -598,7 +596,6 @@ class _ProfilePageState extends State<ProfilePage> with TickerProviderStateMixin
     );
   }
 
-  // ✅ CORRIGÉ - Suppression des filtres problématiques
   Widget _buildPostsContent(List<NetworkPost> posts) {
     if (posts.isEmpty) {
       return const SliverToBoxAdapter(child: SizedBox.shrink());
@@ -627,36 +624,11 @@ class _ProfilePageState extends State<ProfilePage> with TickerProviderStateMixin
     }
   }
 
-  // ✅ CORRIGÉ
-  Widget _buildPhotosContent() {
-    return _buildPostsContent(_posts);
-  }
-
-  // ✅ CORRIGÉ
-  Widget _buildVideosContent() {
-    return _buildPostsContent(_posts);
-  }
-
-  // ✅ CORRIGÉ
-  Widget _buildReelsContent() {
-    return _buildPostsContent(_posts);
-  }
-
-  // ✅ CORRIGÉ
-  Widget _buildLikedContent() {
-    return _buildPostsContent(_posts);
-  }
-
-  // ✅ CORRIGÉ
-  Widget _buildSavedContent() {
-    if (_savedPosts.isEmpty) {
-      return const SliverToBoxAdapter(child: SizedBox.shrink());
-    }
-    return _buildPostsContent(_savedPosts);
-  }
-
+  // ⭐ CORRIGÉ - Récupération dynamique de mediaUrl
   Widget _buildPostGridItem(NetworkPost post) {
-    final hasImage = post.mediaUrl != null && post.mediaUrl!.isNotEmpty;
+    final dynamicPost = post as dynamic;
+    final mediaUrl = dynamicPost.mediaUrl;
+    final hasImage = mediaUrl != null && mediaUrl.toString().isNotEmpty;
     final isPostPinned = _pinnedPosts.any((p) => p.id == post.id);
     
     return GestureDetector(
@@ -665,7 +637,14 @@ class _ProfilePageState extends State<ProfilePage> with TickerProviderStateMixin
         fit: StackFit.expand,
         children: [
           if (hasImage)
-            Image.network(post.mediaUrl!, fit: BoxFit.cover)
+            Image.network(
+              mediaUrl.toString(),
+              fit: BoxFit.cover,
+              errorBuilder: (context, error, stackTrace) => Container(
+                color: Colors.grey[200],
+                child: const Icon(Icons.broken_image, color: Colors.grey),
+              ),
+            )
           else
             Container(
               color: Colors.grey[200],
@@ -707,8 +686,11 @@ class _ProfilePageState extends State<ProfilePage> with TickerProviderStateMixin
     );
   }
 
+  // ⭐ CORRIGÉ - Récupération dynamique de mediaUrl
   Widget _buildPostListItem(NetworkPost post) {
-    final hasImage = post.mediaUrl != null && post.mediaUrl!.isNotEmpty;
+    final dynamicPost = post as dynamic;
+    final mediaUrl = dynamicPost.mediaUrl;
+    final hasImage = mediaUrl != null && mediaUrl.toString().isNotEmpty;
     final isPostPinned = _pinnedPosts.any((p) => p.id == post.id);
     
     return Container(
@@ -723,7 +705,18 @@ class _ProfilePageState extends State<ProfilePage> with TickerProviderStateMixin
           if (hasImage)
             ClipRRect(
               borderRadius: BorderRadius.circular(8),
-              child: Image.network(post.mediaUrl!, width: 60, height: 60, fit: BoxFit.cover),
+              child: Image.network(
+                mediaUrl.toString(),
+                width: 60,
+                height: 60,
+                fit: BoxFit.cover,
+                errorBuilder: (context, error, stackTrace) => Container(
+                  width: 60,
+                  height: 60,
+                  color: Colors.grey[200],
+                  child: const Icon(Icons.broken_image, color: Colors.grey),
+                ),
+              ),
             ),
           const SizedBox(width: 12),
           Expanded(
@@ -750,6 +743,29 @@ class _ProfilePageState extends State<ProfilePage> with TickerProviderStateMixin
         ],
       ),
     );
+  }
+
+  Widget _buildPhotosContent() {
+    return _buildPostsContent(_posts);
+  }
+
+  Widget _buildVideosContent() {
+    return _buildPostsContent(_posts);
+  }
+
+  Widget _buildReelsContent() {
+    return _buildPostsContent(_posts);
+  }
+
+  Widget _buildLikedContent() {
+    return _buildPostsContent(_posts);
+  }
+
+  Widget _buildSavedContent() {
+    if (_savedPosts.isEmpty) {
+      return const SliverToBoxAdapter(child: SizedBox.shrink());
+    }
+    return _buildPostsContent(_savedPosts);
   }
 
   void _editProfile() {
