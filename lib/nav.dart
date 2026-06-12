@@ -328,7 +328,9 @@ static const String thixInfoEdit = '/thix-info/admin/edit/:articleId';
   static const String thixMarketOrders = '/market/orders';
   static const String thixMedia = '/thix-media';
   static const String adminMedia = '/admin/media';
-
+// ==================== MESSAGES & PROFIL PRINCIPAUX ====================
+static const String messages = '/messages';      // Messages THIX ID principal
+static const String profile = '/profile';        // Profil THIX ID principal
   static String enterprisePortalBase(String slug) => '$enterprisePortalBasePath/$slug';
   static String enterprisePortalDashboard(String slug, String section) => '/company/$slug/dashboard/$section';
 }
@@ -525,7 +527,17 @@ class AppRouter {
           name: 'settings',
           pageBuilder: (context, state) => NoTransitionPage(child: SettingsPage()),
         ),
-
+// ==================== MESSAGES & PROFIL PRINCIPAUX ====================
+GoRoute(
+  path: AppRoutes.messages,
+  name: 'messages',
+  pageBuilder: (context, state) => NoTransitionPage(child: ThixChatPage()), // ou votre page messages
+),
+GoRoute(
+  path: AppRoutes.profile,
+  name: 'profile',
+  pageBuilder: (context, state) => NoTransitionPage(child: UserDashboardPage()), // ou votre page profil
+),
         // ==================== RÉSEAU PRO ====================
         GoRoute(
           path: AppRoutes.networkPro,
