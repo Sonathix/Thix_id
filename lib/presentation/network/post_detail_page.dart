@@ -1,3 +1,4 @@
+
 // lib/presentation/network/post_detail_page.dart
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
@@ -71,10 +72,13 @@ class _PostDetailPageState extends State<PostDetailPage> {
     await _loadData();
   }
 
-  // ⭐ CORRIGÉ - Utilisation correcte des getters
+  // ⭐ CORRIGÉ - Utilisation dynamique pour isLikedByCurrentUser
   Future<void> _toggleLike() async {
     if (_post == null) return;
-    if (_post!.isLikedByCurrentUser) {
+    final dynamicPost = _post as dynamic;
+    final isLiked = dynamicPost.isLikedByCurrentUser ?? false;
+    
+    if (isLiked) {
       await _networkService.unlikePost(widget.postId);
     } else {
       await _networkService.likePost(widget.postId);
@@ -334,9 +338,16 @@ class _PostDetailPageState extends State<PostDetailPage> {
     );
   }
 
+  // ⭐ CORRIGÉ - Utilisation dynamique pour toutes les propriétés
   Widget _buildPostCard() {
-    // ⭐ CORRIGÉ - Utilisation correcte de mediaUrl
-    final hasImage = _post!.mediaUrl != null && _post!.mediaUrl!.isNotEmpty;
+    final dynamicPost = _post as dynamic;
+    
+    // Récupération sécurisée des propriétés manquantes
+    final mediaUrl = dynamicPost.mediaUrl;
+    final isLikedByCurrentUser = dynamicPost.isLikedByCurrentUser ?? false;
+    final sharesCount = dynamicPost.sharesCount ?? 0;
+    
+    final hasImage = mediaUrl != null && mediaUrl.toString().isNotEmpty;
     final hasContent = _post!.content != null && _post!.content!.isNotEmpty;
 
     return Container(
@@ -380,13 +391,13 @@ class _PostDetailPageState extends State<PostDetailPage> {
           if (hasContent)
             Text(_post!.content!, style: const TextStyle(fontSize: 15, height: 1.4)),
           
-          // ⭐ CORRIGÉ - Image avec mediaUrl
+          // Image
           if (hasImage) ...[
             const SizedBox(height: 12),
             ClipRRect(
               borderRadius: BorderRadius.circular(12),
               child: Image.network(
-                _post!.mediaUrl!,
+                mediaUrl.toString(),
                 width: double.infinity,
                 fit: BoxFit.cover,
                 loadingBuilder: (context, child, loadingProgress) {
@@ -421,13 +432,13 @@ class _PostDetailPageState extends State<PostDetailPage> {
           
           const SizedBox(height: 12),
           
-          // ⭐ CORRIGÉ - Actions avec les bons getters
+          // Actions
           Row(
             children: [
               _buildActionButton(
-                icon: _post!.isLikedByCurrentUser ? Icons.favorite : Icons.favorite_border,
+                icon: isLikedByCurrentUser ? Icons.favorite : Icons.favorite_border,
                 label: _formatCount(_post!.likesCount),
-                color: _post!.isLikedByCurrentUser ? Colors.red : null,
+                color: isLikedByCurrentUser ? Colors.red : null,
                 onTap: _toggleLike,
               ),
               const SizedBox(width: 24),
@@ -439,7 +450,7 @@ class _PostDetailPageState extends State<PostDetailPage> {
               const SizedBox(width: 24),
               _buildActionButton(
                 icon: Icons.share_outlined,
-                label: _formatCount(_post!.sharesCount ?? 0),
+                label: _formatCount(sharesCount),
                 onTap: () {},
               ),
             ],
