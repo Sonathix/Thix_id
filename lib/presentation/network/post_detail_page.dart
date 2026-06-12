@@ -1,3 +1,4 @@
+// lib/presentation/network/post_detail_page.dart
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:provider/provider.dart';
@@ -25,7 +26,7 @@ class _PostDetailPageState extends State<PostDetailPage> {
   @override
   void initState() {
     super.initState();
-    print('🔍 PostDetailPage - postId reçu: ${widget.postId}');
+    debugPrint('🔍 PostDetailPage - postId reçu: ${widget.postId}');
     _networkService = NetworkService(Supabase.instance.client);
     _loadData();
   }
@@ -39,23 +40,23 @@ class _PostDetailPageState extends State<PostDetailPage> {
   Future<void> _loadData() async {
     setState(() => _loading = true);
     try {
-      print('🔍 Chargement post: ${widget.postId}');
+      debugPrint('🔍 Chargement post: ${widget.postId}');
       final post = await _networkService.getPostById(widget.postId);
-      print('🔍 Post chargé: ${post != null}');
+      debugPrint('🔍 Post chargé: ${post != null}');
       if (post != null) {
-        print('🔍 Contenu du post: ${post.content}');
-        print('🔍 Auteur du post: ${post.authorName}');
+        debugPrint('🔍 Contenu du post: ${post.content}');
+        debugPrint('🔍 Auteur du post: ${post.authorName}');
       } else {
-        print('❌ Post est NULL! Vérifie l\'ID: ${widget.postId}');
+        debugPrint('❌ Post est NULL! Vérifie l\'ID: ${widget.postId}');
       }
       final comments = await _networkService.getComments(widget.postId);
-      print('🔍 Commentaires chargés: ${comments.length}');
+      debugPrint('🔍 Commentaires chargés: ${comments.length}');
       setState(() {
         _post = post;
         _comments = comments;
       });
     } catch (e) {
-      print('❌ Error loading post: $e');
+      debugPrint('❌ Error loading post: $e');
     } finally {
       setState(() => _loading = false);
     }
@@ -70,6 +71,7 @@ class _PostDetailPageState extends State<PostDetailPage> {
     await _loadData();
   }
 
+  // ⭐ CORRIGÉ - Utilisation correcte des getters
   Future<void> _toggleLike() async {
     if (_post == null) return;
     if (_post!.isLikedByCurrentUser) {
@@ -333,6 +335,7 @@ class _PostDetailPageState extends State<PostDetailPage> {
   }
 
   Widget _buildPostCard() {
+    // ⭐ CORRIGÉ - Utilisation correcte de mediaUrl
     final hasImage = _post!.mediaUrl != null && _post!.mediaUrl!.isNotEmpty;
     final hasContent = _post!.content != null && _post!.content!.isNotEmpty;
 
@@ -377,7 +380,7 @@ class _PostDetailPageState extends State<PostDetailPage> {
           if (hasContent)
             Text(_post!.content!, style: const TextStyle(fontSize: 15, height: 1.4)),
           
-          // Image unique avec NetworkImage
+          // ⭐ CORRIGÉ - Image avec mediaUrl
           if (hasImage) ...[
             const SizedBox(height: 12),
             ClipRRect(
@@ -418,7 +421,7 @@ class _PostDetailPageState extends State<PostDetailPage> {
           
           const SizedBox(height: 12),
           
-          // Actions
+          // ⭐ CORRIGÉ - Actions avec les bons getters
           Row(
             children: [
               _buildActionButton(
@@ -436,7 +439,7 @@ class _PostDetailPageState extends State<PostDetailPage> {
               const SizedBox(width: 24),
               _buildActionButton(
                 icon: Icons.share_outlined,
-                label: _formatCount(_post!.sharesCount),
+                label: _formatCount(_post!.sharesCount ?? 0),
                 onTap: () {},
               ),
             ],
