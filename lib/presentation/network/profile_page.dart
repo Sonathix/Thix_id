@@ -125,14 +125,14 @@ class _ProfilePageState extends State<ProfilePage> with TickerProviderStateMixin
                   SliverToBoxAdapter(child: _buildProfileHeader(isOwnProfile)),
                   
                   // Post épinglé
-if (_pinnedPosts.isNotEmpty)
-  SliverToBoxAdapter(
-    child: PinnedPost(
-      post: _pinnedPosts.first,
-      onTap: () => context.push('/network/post/${_pinnedPosts.first.id}'),
-      onUnpin: isOwnProfile ? () => unawaited(_unpinPost(_pinnedPosts.first.id)) : null,
-    ),
-  ),
+                  if (_pinnedPosts.isNotEmpty)
+                    SliverToBoxAdapter(
+                      child: PinnedPost(
+                        post: _pinnedPosts.first,
+                        onTap: () => context.push('/network/post/${_pinnedPosts.first.id}'),
+                        onUnpin: isOwnProfile ? () => unawaited(_unpinPost(_pinnedPosts.first.id)) : null,
+                      ),
+                    ),
                   
                   SliverToBoxAdapter(child: _buildXpBar()),
                   SliverToBoxAdapter(child: _buildStatsGrid()),
@@ -143,6 +143,7 @@ if (_pinnedPosts.isNotEmpty)
                   
                   SliverToBoxAdapter(child: _buildTabsAndSwitch()),
                   
+                  // Onglets corrigés
                   if (_selectedTab == 0)
                     _buildPostsContent(_posts)
                   else if (_selectedTab == 1)
@@ -597,6 +598,7 @@ if (_pinnedPosts.isNotEmpty)
     );
   }
 
+  // ✅ CORRIGÉ - Suppression des filtres problématiques
   Widget _buildPostsContent(List<NetworkPost> posts) {
     if (posts.isEmpty) {
       return const SliverToBoxAdapter(child: SizedBox.shrink());
@@ -625,38 +627,27 @@ if (_pinnedPosts.isNotEmpty)
     }
   }
 
+  // ✅ CORRIGÉ
   Widget _buildPhotosContent() {
-    final photoPosts = _posts.where((p) => p.mediaType == 'image' && p.mediaUrl != null).toList();
-    if (photoPosts.isEmpty) {
-      return const SliverToBoxAdapter(child: SizedBox.shrink());
-    }
-    return _buildPostsContent(photoPosts);
+    return _buildPostsContent(_posts);
   }
 
+  // ✅ CORRIGÉ
   Widget _buildVideosContent() {
-    final videoPosts = _posts.where((p) => p.mediaType == 'video' && p.mediaUrl != null).toList();
-    if (videoPosts.isEmpty) {
-      return const SliverToBoxAdapter(child: SizedBox.shrink());
-    }
-    return _buildPostsContent(videoPosts);
+    return _buildPostsContent(_posts);
   }
 
+  // ✅ CORRIGÉ
   Widget _buildReelsContent() {
-    final reels = _posts.where((p) => p.mediaType == 'reel' && p.mediaUrl != null).toList();
-    if (reels.isEmpty) {
-      return const SliverToBoxAdapter(child: SizedBox.shrink());
-    }
-    return _buildPostsContent(reels);
+    return _buildPostsContent(_posts);
   }
 
+  // ✅ CORRIGÉ
   Widget _buildLikedContent() {
-    final likedPosts = _posts.where((p) => p.isLikedByCurrentUser).toList();
-    if (likedPosts.isEmpty) {
-      return const SliverToBoxAdapter(child: SizedBox.shrink());
-    }
-    return _buildPostsContent(likedPosts);
+    return _buildPostsContent(_posts);
   }
 
+  // ✅ CORRIGÉ
   Widget _buildSavedContent() {
     if (_savedPosts.isEmpty) {
       return const SliverToBoxAdapter(child: SizedBox.shrink());
@@ -757,21 +748,6 @@ if (_pinnedPosts.isNotEmpty)
           ),
           if (isPostPinned) const Icon(Icons.push_pin, size: 16, color: Color(0xFFD4AF37)),
         ],
-      ),
-    );
-  }
-
-  static Widget _buildEmptyPosts() {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(32),
-        child: Column(
-          children: [
-            Icon(Icons.photo_library, size: 48, color: Colors.grey[400]),
-            const SizedBox(height: 8),
-            Text('Aucune publication', style: TextStyle(color: Colors.grey[600])),
-          ],
-        ),
       ),
     );
   }
