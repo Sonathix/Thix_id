@@ -203,15 +203,17 @@ class _HomePagePremiumState extends State<HomePagePremium>
     super.dispose();
   }
 
-  void _navigateToChat() {
+  /// ✅ CORRIGÉ : Navigation vers les MESSAGES (écosystème THIX ID, pas Réseau Pro)
+  void _navigateToMessages() {
     final auth = context.read<AuthController>();
     if (auth.isAuthenticated) {
-      context.push(AppRoutes.networkMessages);
+      context.push(AppRoutes.messages);  // ← Route THIX ID Messages
     } else {
       context.go(AppRoutes.login);
     }
   }
 
+  /// ✅ CORRIGÉ : Navigation vers le PROFIL (écosystème THIX ID, pas Réseau Pro)
   void _navigateToProfile() {
     final auth = context.read<AuthController>();
     if (auth.isAuthenticated) {
@@ -219,23 +221,42 @@ class _HomePagePremiumState extends State<HomePagePremium>
       if (user?.accountType == AccountType.enterprise) {
         context.go(AppRoutes.enterpriseDashboard);
       } else {
-        context.push('/network/profile/${user?.id}');
+        context.push(AppRoutes.profile);  // ← Route THIX ID Profil principal
       }
     } else {
       context.go(AppRoutes.login);
     }
   }
 
+  /// Navigation vers Réseau Pro (gardé pour le service dédié)
   void _navigateToNetworkPro() {
     context.push(AppRoutes.networkPro);
   }
 
-  void _navigateToThixInfo() {
-    context.push(AppRoutes.thixInfo);
+  /// ✅ CORRIGÉ : Navigation THIX INFO avec gestion d'erreur
+  void _navigateToThixInfo() async {
+    try {
+      context.push(AppRoutes.thixInfo);
+    } catch (e) {
+      await FullScreenMessage.showError(
+        context,
+        title: 'Service en cours',
+        message: 'THIX INFO sera disponible prochainement.',
+      );
+    }
   }
 
-  void _navigateToThixEvent() {
-    context.push(AppRoutes.thixEvent);
+  /// ✅ CORRIGÉ : Navigation THIX ÉVÉNEMENT avec gestion d'erreur
+  void _navigateToThixEvent() async {
+    try {
+      context.push(AppRoutes.thixEvent);
+    } catch (e) {
+      await FullScreenMessage.showError(
+        context,
+        title: 'Service en cours',
+        message: 'THIX ÉVÉNEMENT sera disponible prochainement.',
+      );
+    }
   }
 
   void _showEmergencyOverlay() async {
@@ -315,17 +336,7 @@ class _HomePagePremiumState extends State<HomePagePremium>
   }
 
   void _onProfileTap() {
-    final auth = context.read<AuthController>();
-    if (auth.isAuthenticated) {
-      final t = auth.currentUser?.accountType;
-      if (t == AccountType.enterprise) {
-        context.go(AppRoutes.enterpriseDashboard);
-      } else {
-        context.push('/network/profile/${auth.currentUser?.id}');
-      }
-    } else {
-      context.push(AppRoutes.login);
-    }
+    _navigateToProfile();  // ✅ Utilise la même méthode corrigée
   }
 
   Future<void> _handleRequestAccount(BuildContext context) async {
@@ -532,7 +543,7 @@ class _HomePagePremiumState extends State<HomePagePremium>
                               badgeCount: counts.info,
                               onTap: _navigateToThixInfo,
                             ),
-                            // ⭐ THIX ÉVÉNEMENT (NOUVEAU) ⭐
+                            // ✅ THIX ÉVÉNEMENT (UNIQUE - plus de doublon)
                             _ServiceCard(
                               icon: Icons.event_rounded,
                               title: 'THIX ÉVÉNEMENT',
@@ -549,15 +560,7 @@ class _HomePagePremiumState extends State<HomePagePremium>
                               iconColor: const Color(0xFFD4AF37),
                               onTap: () => context.push(AppRoutes.opportunities),
                             ),
-                            // Événements (ancien - à garder)
-                            _ServiceCard(
-                              icon: Icons.event_rounded,
-                              title: 'Événements',
-                              iconBackgroundColor: const Color(0xFFFFEEF1),
-                              iconColor: const Color(0xFFE63946),
-                              badgeCount: counts.events,
-                              onTap: () => context.push(AppRoutes.events),
-                            ),
+                            // ✅ SUPPRIMÉ : l'ancienne carte "Événements" qui créait le doublon
                             // Réseau Pro
                             _ServiceCard(
                               icon: Icons.groups_rounded,
@@ -642,8 +645,8 @@ class _HomePagePremiumState extends State<HomePagePremium>
       ),
       bottomNavigationBar: _FloatingBottomNav(
         onScanTap: () => ThixIdentitySheets.showQrScanSheet(context),
-        onChatTap: _navigateToChat,
-        onProfileTap: _navigateToProfile,
+        onChatTap: _navigateToMessages,      // ✅ CORRIGÉ
+        onProfileTap: _navigateToProfile,    // ✅ CORRIGÉ
         onEmergencyTap: _showEmergencyOverlay,
       ),
     );
@@ -882,7 +885,7 @@ class _SearchBarOverlayState extends State<_SearchBarOverlay> {
                       fontSize: 12,
                     ),
                   ),
-                  const SizedBox(width: 3),
+                  SizedBox(width: 3),
                   Icon(
                     Icons.arrow_forward_rounded,
                     color: ThixPremiumColors.primaryDark,
