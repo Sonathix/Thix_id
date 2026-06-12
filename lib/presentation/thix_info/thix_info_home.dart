@@ -24,6 +24,7 @@ class _ThixInfoHomeState extends State<ThixInfoHome> {
   final ScrollController _scrollController = ScrollController();
   String _selectedCategory = 'featured';
   int _selectedNavIndex = 0;
+  bool _isInitialized = false;
 
   final List<Map<String, dynamic>> _categories = [
     {'slug': 'featured', 'name': 'À la une', 'icon': Icons.local_fire_department},
@@ -39,10 +40,30 @@ class _ThixInfoHomeState extends State<ThixInfoHome> {
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<NewsProvider>().fetchArticles();
-      context.read<NewsProvider>().fetchVideos();
-    });
+    _initializeData();
+  }
+
+  Future<void> _initializeData() async {
+    // Attendre que le contexte soit disponible
+    await Future.delayed(Duration.zero);
+    
+    if (mounted) {
+      final newsProvider = Provider.of<NewsProvider>(context, listen: false);
+      
+      // Charger les données avec gestion d'erreur
+      try {
+        await Future.wait([
+          newsProvider.fetchArticles(),
+          newsProvider.fetchVideos(),
+        ]);
+      } catch (e) {
+        debugPrint('❌ Erreur lors du chargement initial: $e');
+      }
+      
+      setState(() {
+        _isInitialized = true;
+      });
+    }
   }
 
   @override
@@ -77,6 +98,58 @@ class _ThixInfoHomeState extends State<ThixInfoHome> {
     final recentArticles = newsProvider.recentArticles;
     final videos = newsProvider.videos;
     final isLoading = newsProvider.isLoading;
+    final hasError = newsProvider.error != null;
+
+    // Afficher un loader pendant l'initialisation
+    if (!_isInitialized && isLoading) {
+      return const Scaffold(
+        backgroundColor: Color(0xFFF8F9FA),
+        body: Center(
+          child: CircularProgressIndicator(
+            valueColor: AlwaysStoppedAnimation<Color>(Color(0xFFD4AF37)),
+          ),
+        ),
+      );
+    }
+
+    // Afficher une erreur si nécessaire
+    if (hasError && featuredArticle == null && recentArticles.isEmpty) {
+      return Scaffold(
+        backgroundColor: const Color(0xFFF8F9FA),
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.error_outline, size: 64, color: Colors.grey[400]),
+              const SizedBox(height: 16),
+              Text(
+                'Impossible de charger les actualités',
+                style: TextStyle(fontSize: 16, color: Colors.grey[600]),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                newsProvider.error ?? 'Erreur inconnue',
+                style: TextStyle(fontSize: 12, color: Colors.grey[500]),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 24),
+              ElevatedButton(
+                onPressed: () {
+                  newsProvider.clearError();
+                  newsProvider.fetchArticles();
+                  newsProvider.fetchVideos();
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFFD4AF37),
+                  foregroundColor: const Color(0xFF0B1B3D),
+                ),
+                child: const Text('Réessayer'),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8F9FA),
@@ -88,8 +161,18 @@ class _ThixInfoHomeState extends State<ThixInfoHome> {
           SliverToBoxAdapter(child: _buildCategories()),
           const SliverToBoxAdapter(child: SizedBox(height: 12)),
           
+          // Article à la une
           if (isLoading && featuredArticle == null)
-            const SliverToBoxAdapter(child: Center(child: CircularProgressIndicator()))
+            const SliverToBoxAdapter(
+              child: Padding(
+                padding: EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                child: Center(
+                  child: CircularProgressIndicator(
+                    valueColor: AlwaysStoppedAnimation<Color>(Color(0xFFD4AF37)),
+                  ),
+                ),
+              ),
+            )
           else if (featuredArticle != null)
             SliverToBoxAdapter(child: _buildFeaturedArticle(featuredArticle)),
           
@@ -97,8 +180,30 @@ class _ThixInfoHomeState extends State<ThixInfoHome> {
           SliverToBoxAdapter(child: _buildSectionHeader('Actualités récentes', '/thix-info/recent')),
           const SliverToBoxAdapter(child: SizedBox(height: 8)),
           
+          // Actualités récentes
           if (isLoading && recentArticles.isEmpty)
-            const SliverToBoxAdapter(child: Center(child: CircularProgressIndicator()))
+            const SliverToBoxAdapter(
+              child: Padding(
+                padding: EdgeInsets.symmetric(vertical: 32),
+                child: Center(
+                  child: CircularProgressIndicator(
+                    valueColor: AlwaysStoppedAnimation<Color>(Color(0xFFD4AF37)),
+                  ),
+                ),
+              ),
+            )
+          else if (recentArticles.isEmpty && !isLoading)
+            const SliverToBoxAdapter(
+              child: Padding(
+                padding: EdgeInsets.symmetric(vertical: 32),
+                child: Center(
+                  child: Text(
+                    'Aucune actualité disponible',
+                    style: TextStyle(color: Colors.grey),
+                  ),
+                ),
+              ),
+            )
           else
             SliverList(
               delegate: SliverChildBuilderDelegate(
@@ -113,8 +218,30 @@ class _ThixInfoHomeState extends State<ThixInfoHome> {
           SliverToBoxAdapter(child: _buildSectionHeader('Vidéos à la une', '/thix-info/videos')),
           const SliverToBoxAdapter(child: SizedBox(height: 8)),
           
+          // Vidéos
           if (isLoading && videos.isEmpty)
-            const SliverToBoxAdapter(child: Center(child: CircularProgressIndicator()))
+            const SliverToBoxAdapter(
+              child: Padding(
+                padding: EdgeInsets.symmetric(vertical: 32),
+                child: Center(
+                  child: CircularProgressIndicator(
+                    valueColor: AlwaysStoppedAnimation<Color>(Color(0xFFD4AF37)),
+                  ),
+                ),
+              ),
+            )
+          else if (videos.isEmpty && !isLoading)
+            const SliverToBoxAdapter(
+              child: Padding(
+                padding: EdgeInsets.symmetric(vertical: 32),
+                child: Center(
+                  child: Text(
+                    'Aucune vidéo disponible',
+                    style: TextStyle(color: Colors.grey),
+                  ),
+                ),
+              ),
+            )
           else
             SliverToBoxAdapter(
               child: SizedBox(
@@ -243,74 +370,74 @@ class _ThixInfoHomeState extends State<ThixInfoHome> {
   }
 
   Widget _buildFeaturedArticle(NewsArticle article) {
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 8, offset: const Offset(0, 2))],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          if (article.imageUrl != null && article.imageUrl!.isNotEmpty)
-            ClipRRect(
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
-              child: Image.network(
-                article.imageUrl!,
-                height: 180,
-                width: double.infinity,
-                fit: BoxFit.cover,
-                loadingBuilder: (context, child, loadingProgress) {
-                  if (loadingProgress == null) return child;
-                  return Container(
+    return GestureDetector(
+      onTap: () => context.push('/thix-info/article/${article.id}'),
+      child: Container(
+        margin: const EdgeInsets.symmetric(horizontal: 16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 8, offset: const Offset(0, 2))],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (article.imageUrl != null && article.imageUrl!.isNotEmpty)
+              ClipRRect(
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+                child: Image.network(
+                  article.imageUrl!,
+                  height: 180,
+                  width: double.infinity,
+                  fit: BoxFit.cover,
+                  loadingBuilder: (context, child, loadingProgress) {
+                    if (loadingProgress == null) return child;
+                    return Container(
+                      height: 180,
+                      color: Colors.grey[200],
+                      child: const Center(child: CircularProgressIndicator()),
+                    );
+                  },
+                  errorBuilder: (context, error, stackTrace) => Container(
                     height: 180,
                     color: Colors.grey[200],
-                    child: const Center(child: CircularProgressIndicator()),
-                  );
-                },
-                errorBuilder: (context, error, stackTrace) => Container(
-                  height: 180,
-                  color: Colors.grey[200],
-                  child: const Icon(Icons.broken_image, size: 40, color: Colors.grey),
+                    child: const Icon(Icons.broken_image, size: 40, color: Colors.grey),
+                  ),
                 ),
               ),
-            ),
-          Padding(
-            padding: const EdgeInsets.all(12),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(article.title, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, height: 1.3)),
-                const SizedBox(height: 6),
-                Text(article.summary ?? '', style: TextStyle(fontSize: 12, color: Colors.grey[600], height: 1.4), maxLines: 3),
-                const SizedBox(height: 10),
-                Row(
-                  children: [
-                    Icon(Icons.access_time, size: 12, color: Colors.grey[500]),
-                    const SizedBox(width: 4),
-                    Text(_formatTimeAgo(article.publishedAt), style: TextStyle(fontSize: 10, color: Colors.grey[500])),
-                    const SizedBox(width: 12),
-                    Icon(Icons.visibility, size: 12, color: Colors.grey[500]),
-                    const SizedBox(width: 4),
-                    Text(_formatCount(article.viewsCount), style: TextStyle(fontSize: 10, color: Colors.grey[500])),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                GestureDetector(
-                  onTap: () => context.push('/thix-info/article/${article.id}'),
-                  child: Row(
+            Padding(
+              padding: const EdgeInsets.all(12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(article.title, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, height: 1.3)),
+                  const SizedBox(height: 6),
+                  Text(article.summary ?? '', style: TextStyle(fontSize: 12, color: Colors.grey[600], height: 1.4), maxLines: 3),
+                  const SizedBox(height: 10),
+                  Row(
+                    children: [
+                      Icon(Icons.access_time, size: 12, color: Colors.grey[500]),
+                      const SizedBox(width: 4),
+                      Text(_formatTimeAgo(article.publishedAt), style: TextStyle(fontSize: 10, color: Colors.grey[500])),
+                      const SizedBox(width: 12),
+                      Icon(Icons.visibility, size: 12, color: Colors.grey[500]),
+                      const SizedBox(width: 4),
+                      Text(_formatCount(article.viewsCount), style: TextStyle(fontSize: 10, color: Colors.grey[500])),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
                     children: [
                       Text('Lire l\'article', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: const Color(0xFFD4AF37))),
                       const SizedBox(width: 4),
                       Icon(Icons.arrow_forward, size: 12, color: const Color(0xFFD4AF37)),
                     ],
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -389,84 +516,88 @@ class _ThixInfoHomeState extends State<ThixInfoHome> {
   }
 
   Widget _buildVideoCard(NewsArticle video) {
-    return Container(
-      width: 280,
-      margin: const EdgeInsets.only(right: 12),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 4, offset: const Offset(0, 1))],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Stack(
-            children: [
-              ClipRRect(
-                borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
-                child: Image.network(
-                  video.imageUrl ?? '',
-                  height: 140,
-                  width: double.infinity,
-                  fit: BoxFit.cover,
-                  loadingBuilder: (context, child, loadingProgress) {
-                    if (loadingProgress == null) return child;
-                    return Container(
+    return GestureDetector(
+      onTap: () => context.push('/thix-info/article/${video.id}'),
+      child: Container(
+        width: 280,
+        margin: const EdgeInsets.only(right: 12),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 4, offset: const Offset(0, 1))],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Stack(
+              children: [
+                ClipRRect(
+                  borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
+                  child: Image.network(
+                    video.imageUrl ?? '',
+                    height: 140,
+                    width: double.infinity,
+                    fit: BoxFit.cover,
+                    loadingBuilder: (context, child, loadingProgress) {
+                      if (loadingProgress == null) return child;
+                      return Container(
+                        height: 140,
+                        color: Colors.grey[200],
+                        child: const Center(
+                          child: CircularProgressIndicator(),
+                        ),
+                      );
+                    },
+                    errorBuilder: (context, error, stackTrace) => Container(
                       height: 140,
                       color: Colors.grey[200],
-                      child: Center(
-                        child: CircularProgressIndicator(),
-                      ),
-                    );
-                  },
-                  errorBuilder: (context, error, stackTrace) => Container(
-                    height: 140,
-                    color: Colors.grey[200],
-                    child: const Icon(Icons.videocam, size: 40, color: Colors.grey),
+                      child: const Icon(Icons.videocam, size: 40, color: Colors.grey),
+                    ),
                   ),
                 ),
-              ),
-              Positioned(
-                left: 0,
-                right: 0,
-                top: 0,
-                bottom: 0,
-                child: Center(
-                  child: Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: const BoxDecoration(color: Colors.black54, shape: BoxShape.circle),
-                    child: const Icon(Icons.play_arrow, color: Colors.white, size: 32),
+                Positioned(
+                  left: 0,
+                  right: 0,
+                  top: 0,
+                  bottom: 0,
+                  child: Center(
+                    child: Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: const BoxDecoration(color: Colors.black54, shape: BoxShape.circle),
+                      child: const Icon(Icons.play_arrow, color: Colors.white, size: 32),
+                    ),
                   ),
-                ),
-              ),
-            ],
-          ),
-          Padding(
-            padding: const EdgeInsets.all(8),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  video.title,
-                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
-                  maxLines: 2,
-                ),
-                const SizedBox(height: 4),
-                Row(
-                  children: [
-                    Icon(Icons.visibility, size: 10, color: Colors.grey[500]),
-                    const SizedBox(width: 2),
-                    Text(_formatCount(video.viewsCount), style: TextStyle(fontSize: 9, color: Colors.grey[500])),
-                    const SizedBox(width: 6),
-                    Text('•', style: TextStyle(fontSize: 9, color: Colors.grey[400])),
-                    const SizedBox(width: 6),
-                    Text(_formatTimeAgo(video.publishedAt), style: TextStyle(fontSize: 9, color: Colors.grey[500])),
-                  ],
                 ),
               ],
             ),
-          ),
-        ],
+            Padding(
+              padding: const EdgeInsets.all(8),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    video.title,
+                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 4),
+                  Row(
+                    children: [
+                      Icon(Icons.visibility, size: 10, color: Colors.grey[500]),
+                      const SizedBox(width: 2),
+                      Text(_formatCount(video.viewsCount), style: TextStyle(fontSize: 9, color: Colors.grey[500])),
+                      const SizedBox(width: 6),
+                      Text('•', style: TextStyle(fontSize: 9, color: Colors.grey[400])),
+                      const SizedBox(width: 6),
+                      Text(_formatTimeAgo(video.publishedAt), style: TextStyle(fontSize: 9, color: Colors.grey[500])),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -578,7 +709,7 @@ class _ThixInfoHomeState extends State<ThixInfoHome> {
 
   String _getCategoryName(String slug) {
     final cat = _categories.firstWhere((c) => c['slug'] == slug, orElse: () => {'name': slug});
-    return cat['name'];
+    return cat['name'] as String;
   }
 
   void _showNotificationSettings() {
@@ -600,6 +731,7 @@ class _ThixInfoHomeState extends State<ThixInfoHome> {
   }
 
   void _requestNotificationPermission() async {
+    if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('Notifications activées'), duration: Duration(seconds: 1)),
     );
