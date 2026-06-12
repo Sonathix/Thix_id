@@ -243,18 +243,13 @@ class _NetworkProHomeState extends State<NetworkProHome> with TickerProviderStat
       backgroundColor: const Color(0xFFF8F9FA),
       body: Column(
         children: [
-          // Header fixe incurvé
           _buildFixedHeader(auth),
-          
-          // Contenu scrollable
           Expanded(
             child: RefreshIndicator(
               onRefresh: _onRefresh,
               child: CustomScrollView(
                 slivers: [
-                  // Espace réduit entre header et posts
                   const SliverToBoxAdapter(child: SizedBox(height: 8)),
-                  
                   if ((isLoading || _loadingPosts) && posts.isEmpty)
                     const SliverFillRemaining(child: Center(child: CircularProgressIndicator()))
                   else if (posts.isEmpty)
@@ -266,14 +261,11 @@ class _NetworkProHomeState extends State<NetworkProHome> with TickerProviderStat
                         childCount: posts.length,
                       ),
                     ),
-                  
                   const SliverToBoxAdapter(child: SizedBox(height: 80)),
                 ],
               ),
             ),
           ),
-          
-          // Bottom Navigation Bar
           _buildBottomNavBar(),
         ],
       ),
@@ -282,9 +274,6 @@ class _NetworkProHomeState extends State<NetworkProHome> with TickerProviderStat
     );
   }
 
-  // ============================================================
-  // HEADER FIXE INCURVÉ
-  // ============================================================
   Widget _buildFixedHeader(AuthController auth) {
     final user = auth.currentUser;
     
@@ -314,10 +303,8 @@ class _NetworkProHomeState extends State<NetworkProHome> with TickerProviderStat
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             child: Column(
               children: [
-                // Ligne 1: Recherche + Logo + Actions
                 Row(
                   children: [
-                    // Barre de recherche
                     Expanded(
                       child: GestureDetector(
                         onTap: _goToSearch,
@@ -332,34 +319,22 @@ class _NetworkProHomeState extends State<NetworkProHome> with TickerProviderStat
                               SizedBox(width: 10),
                               Icon(Icons.search, color: Colors.white54, size: 16),
                               SizedBox(width: 6),
-                              Text(
-                                'Rechercher...',
-                                style: TextStyle(color: Colors.white54, fontSize: 11),
-                              ),
+                              Text('Rechercher...', style: TextStyle(color: Colors.white54, fontSize: 11)),
                             ],
                           ),
                         ),
                       ),
                     ),
                     const SizedBox(width: 12),
-                    // Logo THIX
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                       decoration: BoxDecoration(
                         gradient: const LinearGradient(colors: [Color(0xFFD4AF37), Color(0xFFE5C55E)]),
                         borderRadius: BorderRadius.circular(10),
                       ),
-                      child: const Text(
-                        'THIX',
-                        style: TextStyle(
-                          color: Color(0xFF0B1B3D),
-                          fontWeight: FontWeight.bold,
-                          fontSize: 11,
-                        ),
-                      ),
+                      child: const Text('THIX', style: TextStyle(color: Color(0xFF0B1B3D), fontWeight: FontWeight.bold, fontSize: 11)),
                     ),
                     const SizedBox(width: 12),
-                    // Notifications
                     IconButton(
                       icon: const Icon(Icons.notifications_none, color: Colors.white, size: 20),
                       onPressed: _goToNotifications,
@@ -367,21 +342,17 @@ class _NetworkProHomeState extends State<NetworkProHome> with TickerProviderStat
                       constraints: const BoxConstraints(),
                     ),
                     const SizedBox(width: 8),
-                    // Avatar profil
                     GestureDetector(
                       onTap: _goToProfile,
                       child: CircleAvatar(
                         radius: 15,
                         backgroundImage: user?.photoUrl != null ? NetworkImage(user!.photoUrl!) : null,
-                        child: user?.photoUrl == null
-                            ? const Icon(Icons.person, size: 14, color: Colors.white)
-                            : null,
+                        child: user?.photoUrl == null ? const Icon(Icons.person, size: 14, color: Colors.white) : null,
                       ),
                     ),
                   ],
                 ),
                 const SizedBox(height: 8),
-                // Ligne 2: Filtres chips
                 _buildFilterChips(),
               ],
             ),
@@ -415,13 +386,7 @@ class _NetworkProHomeState extends State<NetworkProHome> with TickerProviderStat
                 children: [
                   Icon(filter['icon'] as IconData, size: 14, color: isSelected ? const Color(0xFFD4AF37) : Colors.white70),
                   const SizedBox(width: 4),
-                  Text(
-                    filter['label'] as String,
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: isSelected ? const Color(0xFFD4AF37) : Colors.white70,
-                    ),
-                  ),
+                  Text(filter['label'] as String, style: TextStyle(fontSize: 11, color: isSelected ? const Color(0xFFD4AF37) : Colors.white70)),
                 ],
               ),
               onSelected: (selected) {
@@ -440,8 +405,15 @@ class _NetworkProHomeState extends State<NetworkProHome> with TickerProviderStat
     );
   }
 
+  // ⭐ CORRIGÉ - Utilisation sécurisée des propriétés
   Widget _buildPostCard(NetworkPost post) {
-    final hasImage = post.mediaUrl != null && post.mediaUrl!.isNotEmpty;
+    // Vérification sécurisée pour mediaUrl
+    final mediaUrl = (post as dynamic).mediaUrl;
+    final hasImage = mediaUrl != null && mediaUrl.toString().isNotEmpty;
+    
+    // Vérification sécurisée pour isLikedByCurrentUser
+    final isLiked = (post as dynamic).isLikedByCurrentUser ?? false;
+    
     final likeAnimation = _likeAnimations[post.id];
     
     return Container(
@@ -454,7 +426,6 @@ class _NetworkProHomeState extends State<NetworkProHome> with TickerProviderStat
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // En-tête du post
           Padding(
             padding: const EdgeInsets.all(10),
             child: Row(
@@ -480,15 +451,9 @@ class _NetworkProHomeState extends State<NetworkProHome> with TickerProviderStat
                             style: TextStyle(fontSize: 9, color: Colors.grey[500]),
                           ),
                           const SizedBox(width: 4),
-                          Text(
-                            '•',
-                            style: TextStyle(fontSize: 9, color: Colors.grey[400]),
-                          ),
+                          Text('•', style: TextStyle(fontSize: 9, color: Colors.grey[400])),
                           const SizedBox(width: 4),
-                          Text(
-                            _formatTimeAgo(post.createdAt),
-                            style: TextStyle(fontSize: 9, color: Colors.grey[500]),
-                          ),
+                          Text(_formatTimeAgo(post.createdAt), style: TextStyle(fontSize: 9, color: Colors.grey[500])),
                         ],
                       ),
                     ],
@@ -504,24 +469,20 @@ class _NetworkProHomeState extends State<NetworkProHome> with TickerProviderStat
             ),
           ),
           
-          // Contenu
           if (post.content != null && post.content!.isNotEmpty)
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 10),
-              child: Text(
-                post.content!,
-                style: const TextStyle(fontSize: 12, height: 1.4),
-              ),
+              child: Text(post.content!, style: const TextStyle(fontSize: 12, height: 1.4)),
             ),
           
-          // Image
+          // ⭐ CORRIGÉ - Image avec vérification
           if (hasImage)
             Padding(
               padding: const EdgeInsets.only(top: 8),
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(8),
                 child: Image.network(
-                  post.mediaUrl!,
+                  mediaUrl.toString(),
                   width: double.infinity,
                   height: 180,
                   fit: BoxFit.cover,
@@ -536,12 +497,10 @@ class _NetworkProHomeState extends State<NetworkProHome> with TickerProviderStat
               ),
             ),
           
-          // Actions
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
             child: Row(
               children: [
-                // Like button
                 GestureDetector(
                   onTap: () => _toggleLike(post),
                   child: ScaleTransition(
@@ -553,8 +512,8 @@ class _NetworkProHomeState extends State<NetworkProHome> with TickerProviderStat
                     child: Row(
                       children: [
                         Icon(
-                          post.isLikedByCurrentUser ? Icons.favorite : Icons.favorite_border,
-                          color: post.isLikedByCurrentUser ? Colors.red : Colors.grey[600],
+                          isLiked ? Icons.favorite : Icons.favorite_border,
+                          color: isLiked ? Colors.red : Colors.grey[600],
                           size: 18,
                         ),
                         const SizedBox(width: 4),
@@ -567,28 +526,22 @@ class _NetworkProHomeState extends State<NetworkProHome> with TickerProviderStat
                   ),
                 ),
                 const SizedBox(width: 20),
-                // Comment button
                 GestureDetector(
                   onTap: () => _showCommentDialog(post),
                   child: Row(
                     children: [
                       Icon(Icons.comment_outlined, size: 18, color: Colors.grey[600]),
                       const SizedBox(width: 4),
-                      Text(
-                        _formatCount(post.commentsCount),
-                        style: TextStyle(fontSize: 11, color: Colors.grey[600]),
-                      ),
+                      Text(_formatCount(post.commentsCount), style: TextStyle(fontSize: 11, color: Colors.grey[600])),
                     ],
                   ),
                 ),
                 const Spacer(),
-                // Save button
                 GestureDetector(
                   onTap: () {},
                   child: Icon(Icons.bookmark_border, size: 18, color: Colors.grey[600]),
                 ),
                 const SizedBox(width: 16),
-                // Share button
                 GestureDetector(
                   onTap: () {},
                   child: Icon(Icons.share_outlined, size: 18, color: Colors.grey[600]),
@@ -614,15 +567,9 @@ class _NetworkProHomeState extends State<NetworkProHome> with TickerProviderStat
               child: const Icon(Icons.post_add, size: 48, color: Colors.grey),
             ),
             const SizedBox(height: 16),
-            const Text(
-              'Aucune publication',
-              style: TextStyle(fontSize: 15, fontWeight: FontWeight.w500, color: Color(0xFF4B5563)),
-            ),
+            const Text('Aucune publication', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w500, color: Color(0xFF4B5563))),
             const SizedBox(height: 8),
-            const Text(
-              'Soyez le premier à partager quelque chose',
-              style: TextStyle(fontSize: 12, color: Color(0xFF6B7280)),
-            ),
+            const Text('Soyez le premier à partager quelque chose', style: TextStyle(fontSize: 12, color: Color(0xFF6B7280))),
             const SizedBox(height: 16),
             ElevatedButton(
               onPressed: _showCreatePostDialog,
