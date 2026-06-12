@@ -2,6 +2,7 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 import '../../../services/network_service.dart';
 import '../../../providers/feed_provider.dart';
@@ -24,6 +25,8 @@ class _CreatePostDialogState extends State<CreatePostDialog> {
   bool _isUploading = false;
   String? _errorMessage;
   int _selectedPostType = 0;
+  bool _showPreview = false;
+  String _selectedStatus = 'public';
   
   List<Map<String, dynamic>> _mentionSuggestions = [];
   bool _showMentions = false;
@@ -92,154 +95,103 @@ class _CreatePostDialogState extends State<CreatePostDialog> {
 
   Future<void> _pickImages() async {
     try {
-      final result = await FilePicker.platform.pickFiles(
-        type: FileType.image,
-        allowMultiple: true,
-      );
+      final imagePicker = ImagePicker();
+      final pickedFiles = await imagePicker.pickMultiImage();
       
-      if (result != null && result.files.isNotEmpty && mounted) {
+      if (pickedFiles.isNotEmpty && mounted) {
         setState(() {
-          for (final file in result.files) {
-            if (file.path != null) {
-              _selectedImages.add(File(file.path!));
-            }
+          for (var file in pickedFiles) {
+            _selectedImages.add(File(file.path));
           }
-          _selectedPostType = _selectedImages.isNotEmpty ? 1 : 0;
         });
       }
     } catch (e) {
-      _showError('Impossible de charger les images');
+      debugPrint('Error picking images: $e');
+      if (mounted) {
+        setState(() => _errorMessage = 'Erreur lors du sélection des images');
+      }
     }
   }
 
-  Future<void> _pickVideo() async {
+  Future<void> _pickCamera() async {
     try {
-      final result = await FilePicker.platform.pickFiles(
-        type: FileType.video,
-        allowMultiple: false,
-      );
+      final imagePicker = ImagePicker();
+      final pickedFile = await imagePicker.pickImage(source: ImageSource.camera);
       
-      if (result != null && result.files.isNotEmpty && result.files.first.path != null && mounted) {
+      if (pickedFile != null && mounted) {
         setState(() {
-          _selectedVideos.add(File(result.files.first.path!));
-          _selectedPostType = 2;
+          _selectedImages.add(File(pickedFile.path));
         });
       }
     } catch (e) {
-      _showError('Impossible de charger la vidéo');
+      debugPrint('Error picking from camera: $e');
     }
   }
 
   void _removeImage(int index) {
-    setState(() {
-      _selectedImages.removeAt(index);
-      if (_selectedImages.isEmpty && _selectedVideos.isEmpty) {
-        _selectedPostType = 0;
-      }
-    });
+    setState(() => _selectedImages.removeAt(index));
   }
 
-  void _removeVideo() {
-    setState(() {
-      _selectedVideos.clear();
-      _selectedPostType = 0;
-    });
-  }
-
-  void _showError(String message) {
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message), backgroundColor: Colors.red),
-    );
-  }
-
-  Future<void> _submitPost() async {
-    if (_contentController.text.trim().isEmpty && 
-        _selectedImages.isEmpty && 
-        _selectedVideos.isEmpty) {
-      setState(() {
-        _errorMessage = 'Veuillez écrire quelque chose ou ajouter du contenu';
-      });
+  Future<void> _publishPost() async {
+    if (_contentController.text.isEmpty && _selectedImages.isEmpty) {
+      setState(() => _errorMessage = 'Veuillez entrer du contenu ou sélectionner des images');
       return;
     }
-    
-    setState(() {
-      _isUploading = true;
-      _errorMessage = null;
-    });
-    
+
+    setState(() => _isUploading = true);
+
     try {
       final networkService = Provider.of<NetworkService>(context, listen: false);
       final feedProvider = Provider.of<FeedProvider>(context, listen: false);
-      
-      List<String> mediaUrls = [];
-      
-      // Upload des images
-      for (int i = 0; i < _selectedImages.length; i++) {
-        final image = _selectedImages[i];
-        if (mounted) {
-          setState(() => _uploadingFiles.add('Image ${i + 1}'));
-        }
-        
-        final url = await networkService.uploadImage(image.path);
-        if (url != null) mediaUrls.add(url);
-        
-        if (mounted) {
-          setState(() => _uploadingFiles.remove('Image ${i + 1}'));
+
+      // Upload images and get URLs
+      final imageUrls = <String>[];
+      for (var image in _selectedImages) {
+        final url = await networkService.uploadImage(image);
+        if (url.isNotEmpty) {
+          imageUrls.add(url);
         }
       }
-      
-      // Upload des vidéos
-      for (int i = 0; i < _selectedVideos.length; i++) {
-        final video = _selectedVideos[i];
-        if (mounted) {
-          setState(() => _uploadingFiles.add('Vidéo ${i + 1}'));
-        }
+
+      // Create post with status
+      final postId = await networkService.createPost(
+        _contentController.text,
+        imageUrls,
+        status: _selectedStatus,
+      );
+
+      if (postId.isNotEmpty) {
+        debugPrint('✅ Post published successfully: $postId');
         
-        final url = await networkService.uploadImage(video.path);
-        if (url != null) mediaUrls.add(url);
+        // Reload feed
+        await feedProvider.loadFeed();
+        
+        // Call callback if provided
+        widget.onPostCreated?.call();
         
         if (mounted) {
-          setState(() => _uploadingFiles.remove('Vidéo ${i + 1}'));
-        }
-      }
-      
-      bool success = false;
-      
-      if (widget.communityId != null) {
-        final postId = await networkService.createCommunityPost(
-          communityId: widget.communityId!,
-          content: _contentController.text.trim(),
-          images: mediaUrls,
-        );
-        success = postId.isNotEmpty;
-        if (success) {
-          await feedProvider.loadFeed();
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Publication réussie!'),
+              duration: Duration(seconds: 2),
+              backgroundColor: Colors.green,
+            ),
+          );
+          Navigator.pop(context);
         }
       } else {
-        success = await feedProvider.createPost(
-          _contentController.text.trim(),
-          mediaUrls,
-        );
+        if (mounted) {
+          setState(() => _errorMessage = 'Erreur lors de la publication');
+        }
       }
-      
-      if (mounted && success) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Publication créée avec succès'), backgroundColor: Colors.green),
-        );
-        widget.onPostCreated?.call();
-        Navigator.pop(context, true);
-      } else if (mounted) {
-        throw Exception('Échec de la création');
-      }
-      
     } catch (e) {
-      debugPrint('❌ Error creating post: $e');
+      debugPrint('Error publishing post: $e');
       if (mounted) {
-        setState(() {
-          _errorMessage = 'Erreur: ${e.toString()}';
-          _isUploading = false;
-        });
+        setState(() => _errorMessage = 'Erreur: ${e.toString()}');
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isUploading = false);
       }
     }
   }
@@ -247,147 +199,89 @@ class _CreatePostDialogState extends State<CreatePostDialog> {
   @override
   Widget build(BuildContext context) {
     return Dialog(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: Container(
-        padding: const EdgeInsets.all(20),
-        width: MediaQuery.of(context).size.width > 600 ? 550 : double.infinity,
+        constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.9),
         child: Column(
           mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
-              children: [
-                const Expanded(
-                  child: Text('Nouvelle publication', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-                ),
-                IconButton(
-                  icon: const Icon(Icons.close),
-                  onPressed: () => Navigator.pop(context),
-                ),
-              ],
-            ),
-            const Divider(),
+            // Header
             Container(
-              padding: const EdgeInsets.symmetric(vertical: 8),
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                border: Border(bottom: BorderSide(color: Colors.grey[300]!)),
+              ),
               child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  _buildTypeButton(Icons.text_fields, 'Texte', 0),
-                  const SizedBox(width: 8),
-                  _buildTypeButton(Icons.image, 'Image', 1),
-                  const SizedBox(width: 8),
-                  _buildTypeButton(Icons.videocam, 'Vidéo', 2),
+                  const Text(
+                    'Créer une publication',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close),
+                    onPressed: () => Navigator.pop(context),
+                  ),
                 ],
               ),
             ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: _contentController,
-              maxLines: 5,
-              decoration: InputDecoration(
-                hintText: 'Écrivez votre publication... Utilisez #hashtag ou @mention',
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                filled: true,
-                fillColor: Colors.grey[50],
-              ),
+            // Content
+            Flexible(
+              child: _showPreview ? _buildPreview() : _buildEditor(),
             ),
-            const SizedBox(height: 16),
-            if (_uploadingFiles.isNotEmpty)
-              Container(
-                padding: const EdgeInsets.all(12),
-                margin: const EdgeInsets.only(bottom: 12),
-                decoration: BoxDecoration(color: Colors.blue[50], borderRadius: BorderRadius.circular(8)),
-                child: Column(
-                  children: _uploadingFiles.map((text) => Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 4),
-                    child: Row(
-                      children: [
-                        const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)),
-                        const SizedBox(width: 12),
-                        Text(text),
-                      ],
+            // Footer
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                border: Border(top: BorderSide(color: Colors.grey[300]!)),
+              ),
+              child: Row(
+                children: [
+                  if (!_showPreview)
+                    Expanded(
+                      child: ElevatedButton.icon(
+                        onPressed: _isUploading ? null : () => setState(() => _showPreview = true),
+                        icon: const Icon(Icons.preview),
+                        label: const Text('Aperçu'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.blue,
+                        ),
+                      ),
+                    )
+                  else
+                    Expanded(
+                      child: ElevatedButton.icon(
+                        onPressed: _isUploading ? null : () => setState(() => _showPreview = false),
+                        icon: const Icon(Icons.edit),
+                        label: const Text('Modifier'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.grey,
+                        ),
+                      ),
                     ),
-                  )).toList(),
-                ),
-              ),
-            if (_selectedImages.isNotEmpty)
-              Container(
-                height: 120,
-                margin: const EdgeInsets.only(bottom: 12),
-                child: ListView.builder(
-                  scrollDirection: Axis.horizontal,
-                  itemCount: _selectedImages.length,
-                  itemBuilder: (context, index) => Stack(
-                    children: [
-                      Container(
-                        width: 120,
-                        margin: const EdgeInsets.only(right: 8),
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(8),
-                          image: DecorationImage(image: FileImage(_selectedImages[index]), fit: BoxFit.cover),
-                        ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: _isUploading ? null : _publishPost,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFFD4AF37),
                       ),
-                      Positioned(
-                        top: 4,
-                        right: 12,
-                        child: GestureDetector(
-                          onTap: () => _removeImage(index),
-                          child: Container(
-                            padding: const EdgeInsets.all(2),
-                            decoration: const BoxDecoration(color: Colors.black54, shape: BoxShape.circle),
-                            child: const Icon(Icons.close, size: 18, color: Colors.white),
-                          ),
-                        ),
-                      ),
-                    ],
+                      child: _isUploading
+                          ? const SizedBox(
+                              height: 20,
+                              width: 20,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                valueColor: AlwaysStoppedAnimation(Colors.white),
+                              ),
+                            )
+                          : const Text(
+                              'Publier',
+                              style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
+                            ),
+                    ),
                   ),
-                ),
-              ),
-            if (_errorMessage != null)
-              Container(
-                padding: const EdgeInsets.all(8),
-                margin: const EdgeInsets.only(bottom: 12),
-                decoration: BoxDecoration(color: Colors.red[50], borderRadius: BorderRadius.circular(8)),
-                child: Row(
-                  children: [
-                    const Icon(Icons.error_outline, color: Colors.red, size: 18),
-                    const SizedBox(width: 8),
-                    Expanded(child: Text(_errorMessage!, style: const TextStyle(color: Colors.red, fontSize: 12))),
-                  ],
-                ),
-              ),
-            Row(
-              children: [
-                IconButton(
-                  icon: const Icon(Icons.photo_library, color: Colors.green),
-                  onPressed: _isUploading ? null : _pickImages,
-                  tooltip: 'Ajouter des images',
-                ),
-                IconButton(
-                  icon: const Icon(Icons.videocam, color: Colors.orange),
-                  onPressed: _isUploading ? null : _pickVideo,
-                  tooltip: 'Ajouter une vidéo',
-                ),
-                const Spacer(),
-                TextButton(onPressed: _isUploading ? null : () => Navigator.pop(context), child: const Text('Annuler')),
-                const SizedBox(width: 8),
-                ElevatedButton(
-                  onPressed: _isUploading ? null : _submitPost,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFFD4AF37),
-                    foregroundColor: const Color(0xFF0B1B3D),
-                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                  ),
-                  child: _isUploading
-                      ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
-                      : const Text('PUBLIER'),
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            Center(
-              child: Text(
-                'Utilisez #hashtag pour les tendances | @mention pour taguer',
-                style: TextStyle(fontSize: 10, color: Colors.grey[500]),
+                ],
               ),
             ),
           ],
@@ -396,27 +290,293 @@ class _CreatePostDialogState extends State<CreatePostDialog> {
     );
   }
 
-  Widget _buildTypeButton(IconData icon, String label, int type) {
-    final isSelected = _selectedPostType == type;
-    return Flexible(
-      child: GestureDetector(
-        onTap: () => setState(() => _selectedPostType = type),
-        child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 8),
-          decoration: BoxDecoration(
-            color: isSelected ? const Color(0xFFD4AF37).withOpacity(0.1) : Colors.transparent,
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: isSelected ? const Color(0xFFD4AF37) : Colors.grey[300]!),
-          ),
+  Widget _buildEditor() {
+    return ListView(
+      children: [
+        // Content input
+        Padding(
+          padding: const EdgeInsets.all(16),
           child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Icon(icon, color: isSelected ? const Color(0xFFD4AF37) : Colors.grey),
-              const SizedBox(height: 4),
-              Text(label, style: TextStyle(fontSize: 11, color: isSelected ? const Color(0xFFD4AF37) : Colors.grey)),
+              // Status selector
+              const Text('Visibilité:', style: TextStyle(fontWeight: FontWeight.bold)),
+              const SizedBox(height: 8),
+              SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(
+                  children: [
+                    _buildStatusChip('public', '🌐 Public'),
+                    const SizedBox(width: 8),
+                    _buildStatusChip('private', '🔒 Privé'),
+                    const SizedBox(width: 8),
+                    _buildStatusChip('connections', '👥 Connexions'),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+              // Post type
+              const Text('Type de publication:', style: TextStyle(fontWeight: FontWeight.bold)),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Expanded(
+                    child: SegmentedButton<int>(
+                      segments: const [
+                        ButtonSegment(label: Text('Texte'), value: 0),
+                        ButtonSegment(label: Text('Photo'), value: 1),
+                      ],
+                      selected: <int>{_selectedPostType},
+                      onSelectionChanged: (Set<int> newSelection) {
+                        setState(() => _selectedPostType = newSelection.first);
+                      },
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              // Text input
+              TextField(
+                controller: _contentController,
+                maxLines: 8,
+                decoration: InputDecoration(
+                  hintText: 'Quoi de neuf?',
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  filled: true,
+                  fillColor: Colors.grey[100],
+                ),
+              ),
             ],
           ),
         ),
-      ),
+        // Image selector
+        if (_selectedPostType == 1)
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('Photos:', style: TextStyle(fontWeight: FontWeight.bold)),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Expanded(
+                      child: ElevatedButton.icon(
+                        onPressed: _isUploading ? null : _pickImages,
+                        icon: const Icon(Icons.image),
+                        label: const Text('Galerie'),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: ElevatedButton.icon(
+                        onPressed: _isUploading ? null : _pickCamera,
+                        icon: const Icon(Icons.camera_alt),
+                        label: const Text('Caméra'),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        // Selected images preview
+        if (_selectedImages.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('Images sélectionnées:', style: TextStyle(fontWeight: FontWeight.bold)),
+                const SizedBox(height: 8),
+                GridView.builder(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: 3,
+                    crossAxisSpacing: 8,
+                    mainAxisSpacing: 8,
+                  ),
+                  itemCount: _selectedImages.length,
+                  itemBuilder: (context, index) => Stack(
+                    children: [
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(8),
+                        child: Image.file(
+                          _selectedImages[index],
+                          fit: BoxFit.cover,
+                        ),
+                      ),
+                      Positioned(
+                        top: 4,
+                        right: 4,
+                        child: GestureDetector(
+                          onTap: () => _removeImage(index),
+                          child: Container(
+                            decoration: const BoxDecoration(
+                              color: Colors.red,
+                              shape: BoxShape.circle,
+                            ),
+                            padding: const EdgeInsets.all(4),
+                            child: const Icon(
+                              Icons.close,
+                              color: Colors.white,
+                              size: 16,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        // Error message
+        if (_errorMessage != null)
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.red[100],
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Text(
+                _errorMessage!,
+                style: TextStyle(color: Colors.red[700]),
+              ),
+            ),
+          ),
+      ],
     );
+  }
+
+  Widget _buildPreview() {
+    return ListView(
+      children: [
+        Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Status badge
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                decoration: BoxDecoration(
+                  color: _getStatusColor(),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Text(
+                  _getStatusLabel(),
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              // Content preview
+              Card(
+                elevation: 2,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Aperçu de votre publication',
+                        style: TextStyle(fontSize: 14, color: Colors.grey),
+                      ),
+                      const SizedBox(height: 12),
+                      Text(
+                        _contentController.text.isNotEmpty
+                            ? _contentController.text
+                            : '(Pas de texte)',
+                        style: TextStyle(
+                          fontSize: 16,
+                          color: _contentController.text.isNotEmpty
+                              ? Colors.black
+                              : Colors.grey,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              if (_selectedImages.isNotEmpty) ...
+                [
+                  const SizedBox(height: 16),
+                  const Text(
+                    'Images:',
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                  ),
+                  const SizedBox(height: 12),
+                  GridView.builder(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: 2,
+                      crossAxisSpacing: 12,
+                      mainAxisSpacing: 12,
+                    ),
+                    itemCount: _selectedImages.length,
+                    itemBuilder: (context, index) => ClipRRect(
+                      borderRadius: BorderRadius.circular(12),
+                      child: Image.file(
+                        _selectedImages[index],
+                        fit: BoxFit.cover,
+                      ),
+                    ),
+                  ),
+                ],
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildStatusChip(String value, String label) {
+    final isSelected = _selectedStatus == value;
+    return FilterChip(
+      selected: isSelected,
+      label: Text(label),
+      onSelected: (_) => setState(() => _selectedStatus = value),
+      backgroundColor: isSelected ? const Color(0xFFD4AF37).withOpacity(0.2) : Colors.grey[200],
+      side: isSelected
+          ? const BorderSide(color: Color(0xFFD4AF37), width: 2)
+          : BorderSide(color: Colors.grey[300]!),
+    );
+  }
+
+  Color _getStatusColor() {
+    switch (_selectedStatus) {
+      case 'public':
+        return Colors.blue;
+      case 'private':
+        return Colors.red;
+      case 'connections':
+        return Colors.green;
+      default:
+        return Colors.grey;
+    }
+  }
+
+  String _getStatusLabel() {
+    switch (_selectedStatus) {
+      case 'public':
+        return '🌐 Public';
+      case 'private':
+        return '🔒 Privé';
+      case 'connections':
+        return '👥 Connexions';
+      default:
+        return 'Public';
+    }
   }
 }

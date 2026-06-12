@@ -1,24 +1,25 @@
 // lib/models/network_post.dart
-
 class NetworkPost {
   final String id;
   final String userId;
   final String authorName;
   final String? authorAvatar;
   final String? authorTitle;
-  final String? content;
-  final String? mediaUrl;
-  final String mediaType;
-  final bool isPublic;
+  final String content;
+  final List<String> imageUrls;
+  final List<String>? videoUrls;
+  final DateTime createdAt;
+  final DateTime? updatedAt;
   final int likesCount;
   final int commentsCount;
-  final int sharesCount;
-  final DateTime createdAt;
-  bool isLikedByCurrentUser;
-  bool isSavedByCurrentUser;
-  
-  final int? viralScore;
-  final int? viewCount;
+  final int repostsCount;
+  final bool isLiked;
+  final bool isSaved;
+  final bool isReposted;
+  final bool isPublic;
+  final String status; // 'public', 'private', 'connections'
+  final String? communityId;
+  final int? views;
 
   NetworkPost({
     required this.id,
@@ -26,61 +27,53 @@ class NetworkPost {
     required this.authorName,
     this.authorAvatar,
     this.authorTitle,
-    this.content,
-    this.mediaUrl,
-    this.mediaType = 'none',
-    this.isPublic = true,
+    required this.content,
+    this.imageUrls = const [],
+    this.videoUrls,
+    required this.createdAt,
+    this.updatedAt,
     this.likesCount = 0,
     this.commentsCount = 0,
-    this.sharesCount = 0,
-    required this.createdAt,
-    this.isLikedByCurrentUser = false,
-    this.isSavedByCurrentUser = false,
-    this.viralScore,
-    this.viewCount,
+    this.repostsCount = 0,
+    this.isLiked = false,
+    this.isSaved = false,
+    this.isReposted = false,
+    this.isPublic = true,
+    this.status = 'public',
+    this.communityId,
+    this.views,
   });
-
-  bool get isViral {
-    if (viralScore != null) return viralScore! > 100;
-    
-    final ageInHours = DateTime.now().difference(createdAt).inHours;
-    if (ageInHours < 1) return false;
-    
-    final engagementScore = (likesCount * 1) + (commentsCount * 3) + (sharesCount * 5);
-    final engagementPerHour = engagementScore / ageInHours;
-    
-    return engagementPerHour > 10;
-  }
-
-  bool get hasImages => mediaType == 'image' && mediaUrl != null;
-  bool get hasVideo => mediaType == 'video';
-  bool get hasDocument => mediaType == 'document';
-  
-  double get engagementRate {
-    final total = likesCount + commentsCount + sharesCount;
-    final views = viewCount ?? (likesCount * 10); 
-    return views > 0 ? total / views : 0;
-  }
 
   factory NetworkPost.fromJson(Map<String, dynamic> json) {
     return NetworkPost(
-      id: json['id'],
-      userId: json['user_id'],
-      authorName: json['author_name'] ?? json['users']?['display_name'] ?? 'Utilisateur',
-      authorAvatar: json['author_avatar'] ?? json['users']?['photo_url'],
-      authorTitle: json['author_title'] ?? json['users']?['profession'],
-      content: json['content'],
-      mediaUrl: json['media_url'],
-      mediaType: json['media_type'] ?? 'none',
-      isPublic: json['is_public'] ?? true,
-      likesCount: json['likes_count'] ?? 0,
-      commentsCount: json['comments_count'] ?? 0,
-      sharesCount: json['shares_count'] ?? 0,
-      createdAt: DateTime.parse(json['created_at']),
-      isLikedByCurrentUser: json['is_liked'] ?? false,
-      isSavedByCurrentUser: json['is_saved_by_current_user'] ?? false, // ← CORRIGÉ
-      viralScore: json['viral_score'],
-      viewCount: json['view_count'],
+      id: json['id'] as String? ?? '',
+      userId: json['user_id'] as String? ?? '',
+      authorName: json['author_name'] as String? ?? 'Utilisateur',
+      authorAvatar: json['author_avatar'] as String?,
+      authorTitle: json['author_title'] as String?,
+      content: json['content'] as String? ?? '',
+      imageUrls: json['image_urls'] != null
+          ? List<String>.from(json['image_urls'] as List? ?? [])
+          : [],
+      videoUrls: json['video_urls'] != null
+          ? List<String>.from(json['video_urls'] as List? ?? [])
+          : null,
+      createdAt: json['created_at'] != null
+          ? DateTime.parse(json['created_at'] as String)
+          : DateTime.now(),
+      updatedAt: json['updated_at'] != null
+          ? DateTime.parse(json['updated_at'] as String)
+          : null,
+      likesCount: json['likes_count'] as int? ?? 0,
+      commentsCount: json['comments_count'] as int? ?? 0,
+      repostsCount: json['reposts_count'] as int? ?? 0,
+      isLiked: json['is_liked'] as bool? ?? false,
+      isSaved: json['is_saved'] as bool? ?? false,
+      isReposted: json['is_reposted'] as bool? ?? false,
+      isPublic: json['is_public'] as bool? ?? true,
+      status: json['status'] as String? ?? 'public',
+      communityId: json['community_id'] as String?,
+      views: json['views'] as int?,
     );
   }
 
@@ -88,15 +81,27 @@ class NetworkPost {
     return {
       'id': id,
       'user_id': userId,
+      'author_name': authorName,
+      'author_avatar': authorAvatar,
+      'author_title': authorTitle,
       'content': content,
-      'media_url': mediaUrl,
-      'media_type': mediaType,
-      'is_public': isPublic,
-      'shares_count': sharesCount,  // ← AJOUTÉ
+      'image_urls': imageUrls,
+      'video_urls': videoUrls,
       'created_at': createdAt.toIso8601String(),
+      'updated_at': updatedAt?.toIso8601String(),
+      'likes_count': likesCount,
+      'comments_count': commentsCount,
+      'reposts_count': repostsCount,
+      'is_liked': isLiked,
+      'is_saved': isSaved,
+      'is_reposted': isReposted,
+      'is_public': isPublic,
+      'status': status,
+      'community_id': communityId,
+      'views': views,
     };
   }
-  
+
   NetworkPost copyWith({
     String? id,
     String? userId,
@@ -104,17 +109,20 @@ class NetworkPost {
     String? authorAvatar,
     String? authorTitle,
     String? content,
-    String? mediaUrl,
-    String? mediaType,
-    bool? isPublic,
+    List<String>? imageUrls,
+    List<String>? videoUrls,
+    DateTime? createdAt,
+    DateTime? updatedAt,
     int? likesCount,
     int? commentsCount,
-    int? sharesCount,
-    DateTime? createdAt,
-    bool? isLikedByCurrentUser,
-    bool? isSavedByCurrentUser,
-    int? viralScore,
-    int? viewCount,
+    int? repostsCount,
+    bool? isLiked,
+    bool? isSaved,
+    bool? isReposted,
+    bool? isPublic,
+    String? status,
+    String? communityId,
+    int? views,
   }) {
     return NetworkPost(
       id: id ?? this.id,
@@ -123,93 +131,20 @@ class NetworkPost {
       authorAvatar: authorAvatar ?? this.authorAvatar,
       authorTitle: authorTitle ?? this.authorTitle,
       content: content ?? this.content,
-      mediaUrl: mediaUrl ?? this.mediaUrl,
-      mediaType: mediaType ?? this.mediaType,
-      isPublic: isPublic ?? this.isPublic,
+      imageUrls: imageUrls ?? this.imageUrls,
+      videoUrls: videoUrls ?? this.videoUrls,
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
       likesCount: likesCount ?? this.likesCount,
       commentsCount: commentsCount ?? this.commentsCount,
-      sharesCount: sharesCount ?? this.sharesCount,
-      createdAt: createdAt ?? this.createdAt,
-      isLikedByCurrentUser: isLikedByCurrentUser ?? this.isLikedByCurrentUser,
-      isSavedByCurrentUser: isSavedByCurrentUser ?? this.isSavedByCurrentUser,
-      viralScore: viralScore ?? this.viralScore,
-      viewCount: viewCount ?? this.viewCount,
+      repostsCount: repostsCount ?? this.repostsCount,
+      isLiked: isLiked ?? this.isLiked,
+      isSaved: isSaved ?? this.isSaved,
+      isReposted: isReposted ?? this.isReposted,
+      isPublic: isPublic ?? this.isPublic,
+      status: status ?? this.status,
+      communityId: communityId ?? this.communityId,
+      views: views ?? this.views,
     );
-  }
-}
-
-// Extension pour les fonctionnalités supplémentaires
-extension NetworkPostListExtension on List<NetworkPost> {
-  
-  List<NetworkPost> get viral => where((p) => p.isViral).toList();
-  List<NetworkPost> get withImages => where((p) => p.hasImages).toList();
-  List<NetworkPost> get withVideos => where((p) => p.hasVideo).toList();
-  List<NetworkPost> get popular => where((p) => p.likesCount > 100).toList();
-  
-  List<NetworkPost> get recent {
-    final twentyFourHoursAgo = DateTime.now().subtract(const Duration(hours: 24));
-    return where((p) => p.createdAt.isAfter(twentyFourHoursAgo)).toList();
-  }
-  
-  List<NetworkPost> sortedByEngagement() {
-    final list = [...this];
-    list.sort((a, b) => b.engagementRate.compareTo(a.engagementRate));
-    return list;
-  }
-  
-  List<NetworkPost> sortedByViral() {
-    final list = [...this];
-    list.sort((a, b) {
-      final aScore = (a.likesCount * 1) + (a.commentsCount * 3) + (a.sharesCount * 5);
-      final bScore = (b.likesCount * 1) + (b.commentsCount * 3) + (b.sharesCount * 5);
-      return bScore.compareTo(aScore);
-    });
-    return list;
-  }
-  
-  int get totalLikes => fold(0, (sum, post) => sum + post.likesCount);
-  int get totalComments => fold(0, (sum, post) => sum + post.commentsCount);
-  int get totalShares => fold(0, (sum, post) => sum + post.sharesCount);
-  int get totalEngagement => totalLikes + totalComments + totalShares;
-  
-  double get averageEngagementRate {
-    if (isEmpty) return 0;
-    return fold(0.0, (sum, post) => sum + post.engagementRate) / length;
-  }
-  
-  Map<DateTime, List<NetworkPost>> groupByDate() {
-    final map = <DateTime, List<NetworkPost>>{};
-    for (final post in this) {
-      final date = DateTime(post.createdAt.year, post.createdAt.month, post.createdAt.day);
-      map.putIfAbsent(date, () => []).add(post);
-    }
-    return map;
-  }
-  
-  Map<String, List<NetworkPost>> groupByUser() {
-    final map = <String, List<NetworkPost>>{};
-    for (final post in this) {
-      map.putIfAbsent(post.userId, () => []).add(post);
-    }
-    return map;
-  }
-  
-  List<NetworkPost> fromUser(String userId) {
-    return where((p) => p.userId == userId).toList();
-  }
-  
-  List<NetworkPost> topLiked({int limit = 10}) {
-    final sorted = [...this]..sort((a, b) => b.likesCount.compareTo(a.likesCount));
-    return sorted.take(limit).toList();
-  }
-  
-  List<NetworkPost> topCommented({int limit = 10}) {
-    final sorted = [...this]..sort((a, b) => b.commentsCount.compareTo(a.commentsCount));
-    return sorted.take(limit).toList();
-  }
-  
-  List<NetworkPost> topShared({int limit = 10}) {
-    final sorted = [...this]..sort((a, b) => b.sharesCount.compareTo(a.sharesCount));
-    return sorted.take(limit).toList();
   }
 }
