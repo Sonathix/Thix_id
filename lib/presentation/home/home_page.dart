@@ -203,17 +203,17 @@ class _HomePagePremiumState extends State<HomePagePremium>
     super.dispose();
   }
 
-  /// ✅ CORRIGÉ : Navigation vers les MESSAGES (écosystème THIX ID, pas Réseau Pro)
+  /// ✅ Navigation vers les MESSAGES (route principale THIX ID)
   void _navigateToMessages() {
     final auth = context.read<AuthController>();
     if (auth.isAuthenticated) {
-      context.push(AppRoutes.messages);  // ← Route THIX ID Messages
+      context.push(AppRoutes.messages);
     } else {
       context.go(AppRoutes.login);
     }
   }
 
-  /// ✅ CORRIGÉ : Navigation vers le PROFIL (écosystème THIX ID, pas Réseau Pro)
+  /// ✅ Navigation vers le PROFIL (route principale THIX ID)
   void _navigateToProfile() {
     final auth = context.read<AuthController>();
     if (auth.isAuthenticated) {
@@ -221,19 +221,17 @@ class _HomePagePremiumState extends State<HomePagePremium>
       if (user?.accountType == AccountType.enterprise) {
         context.go(AppRoutes.enterpriseDashboard);
       } else {
-        context.push(AppRoutes.profile);  // ← Route THIX ID Profil principal
+        context.push(AppRoutes.profile);
       }
     } else {
       context.go(AppRoutes.login);
     }
   }
 
-  /// Navigation vers Réseau Pro (gardé pour le service dédié)
   void _navigateToNetworkPro() {
     context.push(AppRoutes.networkPro);
   }
 
-  /// ✅ CORRIGÉ : Navigation THIX INFO avec gestion d'erreur
   void _navigateToThixInfo() async {
     try {
       context.push(AppRoutes.thixInfo);
@@ -246,7 +244,6 @@ class _HomePagePremiumState extends State<HomePagePremium>
     }
   }
 
-  /// ✅ CORRIGÉ : Navigation THIX ÉVÉNEMENT avec gestion d'erreur
   void _navigateToThixEvent() async {
     try {
       context.push(AppRoutes.thixEvent);
@@ -336,7 +333,7 @@ class _HomePagePremiumState extends State<HomePagePremium>
   }
 
   void _onProfileTap() {
-    _navigateToProfile();  // ✅ Utilise la même méthode corrigée
+    _navigateToProfile();
   }
 
   Future<void> _handleRequestAccount(BuildContext context) async {
@@ -543,7 +540,7 @@ class _HomePagePremiumState extends State<HomePagePremium>
                               badgeCount: counts.info,
                               onTap: _navigateToThixInfo,
                             ),
-                            // ✅ THIX ÉVÉNEMENT (UNIQUE - plus de doublon)
+                            // ✅ THIX ÉVÉNEMENT (UNIQUE)
                             _ServiceCard(
                               icon: Icons.event_rounded,
                               title: 'THIX ÉVÉNEMENT',
@@ -560,7 +557,7 @@ class _HomePagePremiumState extends State<HomePagePremium>
                               iconColor: const Color(0xFFD4AF37),
                               onTap: () => context.push(AppRoutes.opportunities),
                             ),
-                            // ✅ SUPPRIMÉ : l'ancienne carte "Événements" qui créait le doublon
+                            // ✅ ANCIENNE CARTE "Événements" SUPPRIMÉE
                             // Réseau Pro
                             _ServiceCard(
                               icon: Icons.groups_rounded,
@@ -645,8 +642,8 @@ class _HomePagePremiumState extends State<HomePagePremium>
       ),
       bottomNavigationBar: _FloatingBottomNav(
         onScanTap: () => ThixIdentitySheets.showQrScanSheet(context),
-        onChatTap: _navigateToMessages,      // ✅ CORRIGÉ
-        onProfileTap: _navigateToProfile,    // ✅ CORRIGÉ
+        onChatTap: _navigateToMessages,
+        onProfileTap: _navigateToProfile,
         onEmergencyTap: _showEmergencyOverlay,
       ),
     );
