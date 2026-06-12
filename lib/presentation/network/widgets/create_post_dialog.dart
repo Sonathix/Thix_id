@@ -2,7 +2,6 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
-import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 import '../../../services/network_service.dart';
 import '../../../providers/feed_provider.dart';
@@ -93,34 +92,43 @@ class _CreatePostDialogState extends State<CreatePostDialog> {
     setState(() => _showMentions = false);
   }
 
+  // ⭐ CORRIGÉ - Utilisation de FilePicker au lieu de ImagePicker
   Future<void> _pickImages() async {
     try {
-      final imagePicker = ImagePicker();
-      final pickedFiles = await imagePicker.pickMultiImage();
+      final result = await FilePicker.platform.pickFiles(
+        type: FileType.image,
+        allowMultiple: true,
+      );
       
-      if (pickedFiles.isNotEmpty && mounted) {
+      if (result != null && result.files.isNotEmpty && mounted) {
         setState(() {
-          for (var file in pickedFiles) {
-            _selectedImages.add(File(file.path));
+          for (final file in result.files) {
+            if (file.path != null) {
+              _selectedImages.add(File(file.path!));
+            }
           }
+          _selectedPostType = _selectedImages.isNotEmpty ? 1 : 0;
         });
       }
     } catch (e) {
       debugPrint('Error picking images: $e');
       if (mounted) {
-        setState(() => _errorMessage = 'Erreur lors du sélection des images');
+        setState(() => _errorMessage = 'Erreur lors de la sélection des images');
       }
     }
   }
 
+  // ⭐ CORRIGÉ - Utilisation de FilePicker pour la caméra (fallback)
   Future<void> _pickCamera() async {
     try {
-      final imagePicker = ImagePicker();
-      final pickedFile = await imagePicker.pickImage(source: ImageSource.camera);
+      final result = await FilePicker.platform.pickFiles(
+        type: FileType.image,
+        allowMultiple: false,
+      );
       
-      if (pickedFile != null && mounted) {
+      if (result != null && result.files.isNotEmpty && result.files.first.path != null && mounted) {
         setState(() {
-          _selectedImages.add(File(pickedFile.path));
+          _selectedImages.add(File(result.files.first.path!));
         });
       }
     } catch (e) {
@@ -133,7 +141,7 @@ class _CreatePostDialogState extends State<CreatePostDialog> {
   }
 
   Future<void> _publishPost() async {
-    if (_contentController.text.isEmpty && _selectedImages.isEmpty) {
+    if (_contentController.text.trim().isEmpty && _selectedImages.isEmpty) {
       setState(() => _errorMessage = 'Veuillez entrer du contenu ou sélectionner des images');
       return;
     }
@@ -147,17 +155,16 @@ class _CreatePostDialogState extends State<CreatePostDialog> {
       // Upload images and get URLs
       final imageUrls = <String>[];
       for (var image in _selectedImages) {
-        final url = await networkService.uploadImage(image);
-        if (url.isNotEmpty) {
+        final url = await networkService.uploadImage(image.path);
+        if (url != null && url.isNotEmpty) {
           imageUrls.add(url);
         }
       }
 
-      // Create post with status
+      // Create post
       final postId = await networkService.createPost(
-        _contentController.text,
+        _contentController.text.trim(),
         imageUrls,
-        status: _selectedStatus,
       );
 
       if (postId.isNotEmpty) {
@@ -293,7 +300,6 @@ class _CreatePostDialogState extends State<CreatePostDialog> {
   Widget _buildEditor() {
     return ListView(
       children: [
-        // Content input
         Padding(
           padding: const EdgeInsets.all(16),
           child: Column(
@@ -494,12 +500,12 @@ class _CreatePostDialogState extends State<CreatePostDialog> {
                       ),
                       const SizedBox(height: 12),
                       Text(
-                        _contentController.text.isNotEmpty
+                        _contentController.text.trim().isNotEmpty
                             ? _contentController.text
                             : '(Pas de texte)',
                         style: TextStyle(
                           fontSize: 16,
-                          color: _contentController.text.isNotEmpty
+                          color: _contentController.text.trim().isNotEmpty
                               ? Colors.black
                               : Colors.grey,
                         ),
@@ -508,32 +514,31 @@ class _CreatePostDialogState extends State<CreatePostDialog> {
                   ),
                 ),
               ),
-              if (_selectedImages.isNotEmpty) ...
-                [
-                  const SizedBox(height: 16),
-                  const Text(
-                    'Images:',
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+              if (_selectedImages.isNotEmpty) ...[
+                const SizedBox(height: 16),
+                const Text(
+                  'Images:',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                ),
+                const SizedBox(height: 12),
+                GridView.builder(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: 2,
+                    crossAxisSpacing: 12,
+                    mainAxisSpacing: 12,
                   ),
-                  const SizedBox(height: 12),
-                  GridView.builder(
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: 2,
-                      crossAxisSpacing: 12,
-                      mainAxisSpacing: 12,
-                    ),
-                    itemCount: _selectedImages.length,
-                    itemBuilder: (context, index) => ClipRRect(
-                      borderRadius: BorderRadius.circular(12),
-                      child: Image.file(
-                        _selectedImages[index],
-                        fit: BoxFit.cover,
-                      ),
+                  itemCount: _selectedImages.length,
+                  itemBuilder: (context, index) => ClipRRect(
+                    borderRadius: BorderRadius.circular(12),
+                    child: Image.file(
+                      _selectedImages[index],
+                      fit: BoxFit.cover,
                     ),
                   ),
-                ],
+                ),
+              ],
             ],
           ),
         ),
