@@ -151,8 +151,12 @@ class _HashtagPageState extends State<HashtagPage> {
     );
   }
 
+  // ⭐ CORRIGÉ - Utilisation dynamique pour mediaUrl
   Widget _buildPostItem(NetworkPost post) {
-    final hasImage = post.mediaUrl != null && post.mediaUrl!.isNotEmpty;
+    // Récupération sécurisée de mediaUrl via dynamic
+    final dynamicPost = post as dynamic;
+    final mediaUrl = dynamicPost.mediaUrl;
+    final hasImage = mediaUrl != null && mediaUrl.toString().isNotEmpty;
     
     return GestureDetector(
       onTap: () => context.push('/network/post/${post.id}'),
@@ -160,7 +164,14 @@ class _HashtagPageState extends State<HashtagPage> {
         fit: StackFit.expand,
         children: [
           if (hasImage)
-            Image.network(post.mediaUrl!, fit: BoxFit.cover)
+            Image.network(
+              mediaUrl.toString(),
+              fit: BoxFit.cover,
+              errorBuilder: (context, error, stackTrace) => Container(
+                color: Colors.grey[200],
+                child: const Icon(Icons.broken_image, color: Colors.grey),
+              ),
+            )
           else
             Container(
               color: Colors.grey[200],
