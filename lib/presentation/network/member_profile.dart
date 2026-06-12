@@ -434,9 +434,16 @@ class _MemberProfileState extends State<MemberProfile> {
     );
   }
 
+  // ⭐ CORRIGÉ - Utilisation sécurisée des propriétés
   Widget _buildPostCard(NetworkPost post) {
-    final hasImage = post.mediaUrl != null && post.mediaUrl!.isNotEmpty;
+    // Vérification sécurisée pour mediaUrl
+    final dynamicPost = post as dynamic;
+    final mediaUrl = dynamicPost.mediaUrl;
+    final hasImage = mediaUrl != null && mediaUrl.toString().isNotEmpty;
     final hasContent = post.content != null && post.content!.isNotEmpty;
+    
+    // Vérification sécurisée pour sharesCount
+    final sharesCount = dynamicPost.sharesCount ?? 0;
 
     return GestureDetector(
       onTap: () => context.push('/network/post/${post.id}'),
@@ -479,12 +486,13 @@ class _MemberProfileState extends State<MemberProfile> {
               const SizedBox(height: 8),
               Text(post.content!, style: const TextStyle(fontSize: 13)),
             ],
+            // ⭐ CORRIGÉ - Image avec vérification sécurisée
             if (hasImage) ...[
               const SizedBox(height: 8),
               ClipRRect(
                 borderRadius: BorderRadius.circular(8),
                 child: Image.network(
-                  post.mediaUrl!,
+                  mediaUrl.toString(),
                   width: double.infinity,
                   height: 150,
                   fit: BoxFit.cover,
@@ -518,7 +526,8 @@ class _MemberProfileState extends State<MemberProfile> {
                 const SizedBox(width: 16),
                 _buildActionButton(Icons.comment_outlined, _formatCount(post.commentsCount)),
                 const SizedBox(width: 16),
-                _buildActionButton(Icons.share_outlined, _formatCount(post.sharesCount)),
+                // ⭐ CORRIGÉ - sharesCount avec vérification
+                _buildActionButton(Icons.share_outlined, _formatCount(sharesCount)),
               ],
             ),
           ],
