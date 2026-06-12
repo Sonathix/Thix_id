@@ -33,6 +33,7 @@ class _ThixEventHomeState extends State<ThixEventHome> {
   // ============================================================
   final ScrollController _scrollController = ScrollController();
   int _selectedNavIndex = 0;
+  bool _isInitialized = false;
 
   final List<Map<String, String>> _dateFilters = [
     {'value': 'today', 'label': "Aujourd'hui"},
@@ -48,10 +49,30 @@ class _ThixEventHomeState extends State<ThixEventHome> {
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<EventProvider>().fetchEvents();
-      context.read<EventProvider>().fetchFeaturedEvents();
-    });
+    _initializeData();
+  }
+
+  Future<void> _initializeData() async {
+    // Attendre que le contexte soit disponible
+    await Future.delayed(Duration.zero);
+    
+    if (mounted) {
+      final eventProvider = Provider.of<EventProvider>(context, listen: false);
+      
+      // Charger les données avec gestion d'erreur
+      try {
+        await Future.wait([
+          eventProvider.fetchEvents(),
+          eventProvider.fetchFeaturedEvents(),
+        ]);
+      } catch (e) {
+        debugPrint('❌ Erreur lors du chargement initial: $e');
+      }
+      
+      setState(() {
+        _isInitialized = true;
+      });
+    }
   }
 
   @override
@@ -111,6 +132,7 @@ class _ThixEventHomeState extends State<ThixEventHome> {
   }
 
   void _requestNotificationPermission() async {
+    if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('Notifications activées'), duration: Duration(seconds: 1)),
     );
@@ -127,6 +149,58 @@ class _ThixEventHomeState extends State<ThixEventHome> {
     final recommendedEvents = events.take(4).toList();
     final upcomingEvents = events.skip(4).take(6).toList();
     final isLoading = eventProvider.isLoading;
+    final hasError = eventProvider.error != null;
+
+    // Afficher un loader pendant l'initialisation
+    if (!_isInitialized && isLoading) {
+      return const Scaffold(
+        backgroundColor: Color(0xFFF8F9FA),
+        body: Center(
+          child: CircularProgressIndicator(
+            valueColor: AlwaysStoppedAnimation<Color>(Color(0xFFD4AF37)),
+          ),
+        ),
+      );
+    }
+
+    // Afficher une erreur si nécessaire
+    if (hasError && events.isEmpty) {
+      return Scaffold(
+        backgroundColor: const Color(0xFFF8F9FA),
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.error_outline, size: 64, color: Colors.grey[400]),
+              const SizedBox(height: 16),
+              Text(
+                'Impossible de charger les événements',
+                style: TextStyle(fontSize: 16, color: Colors.grey[600]),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                eventProvider.error ?? 'Erreur inconnue',
+                style: TextStyle(fontSize: 12, color: Colors.grey[500]),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 24),
+              ElevatedButton(
+                onPressed: () {
+                  eventProvider.clearError();
+                  eventProvider.fetchEvents();
+                  eventProvider.fetchFeaturedEvents();
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFFD4AF37),
+                  foregroundColor: const Color(0xFF0B1B3D),
+                ),
+                child: const Text('Réessayer'),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8F9FA),
@@ -146,12 +220,32 @@ class _ThixEventHomeState extends State<ThixEventHome> {
           SliverToBoxAdapter(child: _buildCategorySection()),
           const SliverToBoxAdapter(child: SizedBox(height: 16)),
           SliverToBoxAdapter(child: _buildSectionHeader('Événements recommandés', '/thix-event/recommended')),
-          
-          // ⭐ CORRIGÉ
           const SliverToBoxAdapter(child: SizedBox(height: 8)),
           
+          // Section événements recommandés
           if (isLoading && recommendedEvents.isEmpty)
-            SliverToBoxAdapter(child: Center(child: CircularProgressIndicator()))
+            const SliverToBoxAdapter(
+              child: Padding(
+                padding: EdgeInsets.symmetric(vertical: 32),
+                child: Center(
+                  child: CircularProgressIndicator(
+                    valueColor: AlwaysStoppedAnimation<Color>(Color(0xFFD4AF37)),
+                  ),
+                ),
+              ),
+            )
+          else if (recommendedEvents.isEmpty && !isLoading)
+            const SliverToBoxAdapter(
+              child: Padding(
+                padding: EdgeInsets.symmetric(vertical: 32),
+                child: Center(
+                  child: Text(
+                    'Aucun événement disponible',
+                    style: TextStyle(color: Colors.grey),
+                  ),
+                ),
+              ),
+            )
           else
             SliverToBoxAdapter(
               child: GridView.builder(
@@ -176,12 +270,32 @@ class _ThixEventHomeState extends State<ThixEventHome> {
           SliverToBoxAdapter(child: _buildNotificationBanner()),
           const SliverToBoxAdapter(child: SizedBox(height: 16)),
           SliverToBoxAdapter(child: _buildSectionHeader('Prochains événements', '/thix-event/upcoming')),
-          
-          // ⭐ CORRIGÉ
           const SliverToBoxAdapter(child: SizedBox(height: 8)),
           
+          // Section prochains événements
           if (isLoading && upcomingEvents.isEmpty)
-            SliverToBoxAdapter(child: Center(child: CircularProgressIndicator()))
+            const SliverToBoxAdapter(
+              child: Padding(
+                padding: EdgeInsets.symmetric(vertical: 32),
+                child: Center(
+                  child: CircularProgressIndicator(
+                    valueColor: AlwaysStoppedAnimation<Color>(Color(0xFFD4AF37)),
+                  ),
+                ),
+              ),
+            )
+          else if (upcomingEvents.isEmpty && !isLoading)
+            const SliverToBoxAdapter(
+              child: Padding(
+                padding: EdgeInsets.symmetric(vertical: 32),
+                child: Center(
+                  child: Text(
+                    'Aucun événement à venir',
+                    style: TextStyle(color: Colors.grey),
+                  ),
+                ),
+              ),
+            )
           else
             SliverList(
               delegate: SliverChildBuilderDelegate(
@@ -239,7 +353,7 @@ class _ThixEventHomeState extends State<ThixEventHome> {
                   ),
                   IconButton(
                     icon: const Icon(Icons.notifications_none, color: Colors.white, size: 20),
-                    onPressed: () => _showNotificationSettings(),
+                    onPressed: _showNotificationSettings,
                   ),
                   GestureDetector(
                     onTap: () => context.push('/profile'),
