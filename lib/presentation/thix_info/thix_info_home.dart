@@ -414,7 +414,7 @@ class _ThixInfoHomeState extends State<ThixInfoHome> {
                     return Container(
                       height: 140,
                       color: Colors.grey[200],
-                      child: const Center(
+                      child: Center(
                         child: CircularProgressIndicator(),
                       ),
                     );
@@ -497,8 +497,8 @@ class _ThixInfoHomeState extends State<ThixInfoHome> {
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16),
       padding: const EdgeInsets.all(14),
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: [Color(0xFF0B1B3D), Color(0xFF1A2B4D)],

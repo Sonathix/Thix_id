@@ -88,7 +88,7 @@ class CategoryChipsList extends StatelessWidget {
                   const SizedBox(width: 6),
                   Text(
                     cat['label'] as String,
-                    style: const TextStyle(fontSize: 12, color: Colors.grey[700]),
+                    style: TextStyle(fontSize: 12, color: Colors.grey[700]),
                   ),
                 ],
               ),
